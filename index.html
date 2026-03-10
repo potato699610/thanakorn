@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BAANHAO.COM — ร้านค้าออนไลน์</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+<style>
+.form-msg { font-size:13px; padding:8px 12px; border-radius:6px; display:none; }
+.form-msg:not(:empty) { display:block; }
+.form-msg.success { background:#1a3a1a; color:#4caf50; border:1px solid #4caf50; }
+.form-msg.error   { background:#3a1a1a; color:#f44336; border:1px solid #f44336; }
+
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-backdrop.open {
+  display: flex;
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo" onclick="showPage('home')">BAANHAO<span>.COM</span></div>
+  <div class="nav-search" style="position:relative">
+    <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:14px;pointer-events:none">🔍</span>
+    <input type="text" id="navSearch" placeholder="ค้นหาสินค้า..."
+      style="padding-left:32px"
+      oninput="liveSearch(this.value)"
+      onkeydown="if(event.key==='Enter'){doNavSearch(this.value);hideLiveSearch()}"
+      onblur="setTimeout(hideLiveSearch,150)">
+    <div id="liveSearchDrop" style="display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface2);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:999;max-height:320px;overflow-y:auto"></div>
+  </div>
+  <div class="nav-btns">
+    <button class="btn btn-ghost" onclick="showPage('shop')">🛍 สินค้า</button>
+    <span id="adminToggle" style="display:none">
+      <button class="btn btn-ghost" onclick="showPage('admin')">⚙ Admin</button>
+    </span>
+    <span id="authBtns">
+      <button class="btn btn-ghost" onclick="openAuth('login')">เข้าสู่ระบบ</button>
+      <button class="btn btn-primary" onclick="openAuth('register')">สมัครสมาชิก</button>
+    </span>
+    <span id="userBtns" style="display:none">
+      <button class="btn btn-ghost" onclick="showPage('profile')">👤 <span id="userNameNav"></span></button>
+      <button class="btn btn-ghost" onclick="logout()">ออก</button>
+    </span>
+    <button class="cart-btn" onclick="toggleCart()">🛒 <span class="cart-count" id="cartCount">0</span></button>
+  </div>
+</nav>
+
+<div class="toast-wrap" id="toastWrap"></div>
+
+<!-- HOME -->
+<div class="page active" id="page-home">
+  <div class="hero">
+    <h1>ช้อปปิ้งออนไลน์<br><em>ที่ดีที่สุด</em></h1>
+    <p>สินค้าคุณภาพ จัดส่งรวดเร็ว ราคาย่อมเยา ครบทุกความต้องการของคุณ</p>
+    <div class="hero-btns">
+      <button class="btn btn-primary" style="padding:.75rem 2rem;font-size:1rem" onclick="showPage('shop')">ช้อปเลย →</button>
+      <button class="btn btn-ghost" style="padding:.75rem 2rem;font-size:1rem" onclick="openAuth('register')">สมัครสมาชิก</button>
+    </div>
+    <div class="category-chips" id="homeCats"></div>
+  </div>
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">🔥 สินค้าแนะนำ</div>
+      <button class="btn btn-ghost" onclick="showPage('shop')">ดูทั้งหมด →</button>
+    </div>
+    <div class="products-grid" id="featuredGrid"></div>
+  </div>
+</div>
+
+<!-- SHOP -->
+<div class="page" id="page-shop">
+  <div class="section">
+    <div class="section-header"><div class="section-title">🛍 สินค้าทั้งหมด</div></div>
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem;align-items:center">
+      <input type="text" id="shopSearch" placeholder="ค้นหาสินค้า..." class="search-input" style="max-width:280px" oninput="filterProducts()">
+      <div class="category-chips" id="shopCats" style="margin-top:0"></div>
+    </div>
+    <div class="products-grid" id="shopGrid"></div>
+      <div id="shopPagination" style="margin-top:2rem"></div>
+  </div>
+</div>
+
+<!-- PROFILE -->
+<div class="page" id="page-profile">
+  <div class="section-profile">
+    <div class="section-title" style="margin-bottom:1.5rem">👤 ข้อมูลส่วนตัว</div>
+    <div class="form-panel" id="profilePanel"></div>
+    <div class="section-title" style="margin:1.5rem 0 1rem">📦 คำสั่งซื้อของฉัน</div>
+    <div id="myOrders"></div>
+  </div>
+</div>
+
+<!-- CHECKOUT -->
+<div class="page" id="page-checkout">
+  <div class="checkout-grid">
+    <div>
+      <div class="section-title" style="margin-bottom:1rem">💳 ชำระเงิน</div>
+      <div class="checkout-section">
+        <div class="checkout-section-title">📍 ที่อยู่จัดส่ง</div>
+        <div class="form-grid">
+          <div class="form-group"><label>ชื่อ-นามสกุล *</label><input id="ckName" placeholder="ชื่อผู้รับ"></div>
+          <div class="form-group"><label>เบอร์โทรศัพท์ *</label><input id="ckPhone" placeholder="08x-xxx-xxxx"></div>
+          <div class="form-group form-wide"><label>ที่อยู่ *</label><input id="ckAddr" placeholder="บ้านเลขที่ ถนน แขวง/ตำบล อำเภอ"></div>
+          <div class="form-group"><label>จังหวัด</label><input id="ckCity" placeholder="กรุงเทพมหานคร"></div>
+          <div class="form-group"><label>รหัสไปรษณีย์</label><input id="ckZip" placeholder="10xxx"></div>
+        </div>
+      </div>
+      <div class="checkout-section">
+        <div class="checkout-section-title">💳 วิธีชำระเงิน</div>
+        <div style="display:flex;flex-direction:column;gap:.25rem">
+          <label class="payment-option"><input type="radio" name="payment" value="transfer" checked onchange="togglePromptPay(false)"> 💸 โอนเงินผ่านธนาคาร</label>
+          <label class="payment-option"><input type="radio" name="payment" value="cod" onchange="togglePromptPay(false)"> 📦 เก็บเงินปลายทาง (+30 บาท)</label>
+          <label class="payment-option"><input type="radio" name="payment" value="promptpay" onchange="togglePromptPay(true)"> 📱 QR Code PromptPay</label>
+          <div id="promptpayBox" style="display:none;margin-top:.75rem;padding:1rem;background:var(--surface2);border-radius:10px;border:1px solid var(--border)">
+            <div class="form-group">
+              <label>📞 เบอร์มือถือ หรือ เลขบัตรประชาชน</label>
+              <input id="ppNumber" placeholder="เช่น 0812345678" maxlength="13" oninput="liveQR(this.value)">
+              <span style="font-size:.75rem;color:var(--text2);margin-top:.3rem;display:block">QR Code จะแสดงอัตโนมัติหลังกรอกเบอร์ครบ</span>
+            </div>
+            <div id="liveQRWrap" style="display:none;margin-top:1rem;text-align:center">
+              <div style="font-size:.78rem;color:var(--text2);margin-bottom:.5rem">ตัวอย่าง QR Code (สแกนได้จริง)</div>
+              <div style="background:#fff;padding:.75rem;border-radius:8px;display:inline-block"><div id="liveQRCode"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="checkout-section" style="position:sticky;top:80px">
+        <div class="checkout-section-title">🧾 สรุปคำสั่งซื้อ</div>
+        <div id="ckSummary"></div>
+        <div style="display:flex;justify-content:space-between;font-weight:700;font-size:1.1rem;padding-top:.75rem">
+          <span>ยอดรวม</span><span id="ckTotal" style="color:var(--accent)"></span>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:1rem;padding:.75rem;font-size:1rem" onclick="placeOrder()">✅ ยืนยันคำสั่งซื้อ</button>
+        <button class="btn btn-ghost" style="width:100%;margin-top:.5rem" onclick="showPage('shop')">← กลับไปช้อปต่อ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div class="page" id="page-admin">
+  <div class="admin-layout">
+    <div class="admin-sidebar">
+      <div class="admin-sidebar-label">จัดการระบบ</div>
+      <div class="admin-nav-item active" onclick="adminTab('dashboard',this)">📊 ภาพรวม</div>
+      <div class="admin-nav-item" onclick="adminTab('products',this)">📦 จัดการสินค้า</div>
+      <div class="admin-nav-item" onclick="adminTab('categories',this)">🏷 จัดการประเภท</div>
+      <div class="admin-nav-item" onclick="adminTab('orders',this)">🛒 จัดการออเดอร์</div>
+      <div class="admin-nav-item" onclick="adminTab('customers',this)">👥 จัดการลูกค้า</div>
+      <div style="padding:1.5rem;border-top:1px solid var(--border);margin-top:1rem">
+        <button class="btn btn-ghost" style="width:100%" onclick="showPage('home')">← กลับหน้าร้าน</button>
+      </div>
+    </div>
+    <div class="admin-main" id="adminMain"></div>
+  </div>
+</div>
+
+<!-- PRODUCT MODAL -->
+<div class="overlay" id="productModal" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header"><strong id="modalTitle"></strong><button class="close-btn" onclick="closeProductModal()">✕</button></div>
+    <div class="modal-body">
+      <div>
+        <div class="modal-img" id="modalImg"></div>
+        <div class="modal-thumbs" id="modalThumbs"></div>
+      </div>
+      <div class="modal-info">
+        <div class="modal-info-cat" id="modalCat"></div>
+        <h2 id="modalName"></h2>
+        <div class="modal-price" id="modalPrice"></div>
+        <p class="modal-desc" id="modalDesc"></p>
+        <div class="qty-control">
+          <button class="qty-btn" onclick="changeQty(-1)">−</button>
+          <span id="qtyVal" style="min-width:30px;text-align:center;font-weight:600;font-size:1.1rem">1</span>
+          <button class="qty-btn" onclick="changeQty(1)">+</button>
+          <span style="font-size:.8rem;color:var(--text2)">ชิ้น</span>
+        </div>
+        <button class="btn btn-primary" style="width:100%;padding:.75rem" onclick="addToCartModal()">🛒 เพิ่มลงตะกร้า</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- AUTH MODAL -->
+<div class="overlay" id="authModal" onclick="closeModal(event)">
+  <div class="modal" style="max-width:440px">
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="loginTab" onclick="switchAuthTab('login')">เข้าสู่ระบบ</div>
+      <div class="auth-tab" id="registerTab" onclick="switchAuthTab('register')">สมัครสมาชิก</div>
+    </div>
+    <div class="auth-form" id="loginForm">
+      <div class="form-group"><label>อีเมล</label><input id="loginEmail" type="email" placeholder="email@example.com"></div>
+      <div class="form-group"><label>รหัสผ่าน</label><input id="loginPass" type="password" placeholder="••••••••" onkeydown="if(event.key===&apos;Enter&apos;) doLogin()"></div>
+      <div style="text-align:right;margin-top:-8px;margin-bottom:8px;">
+        <a href="#" onclick="event.stopPropagation();openForgotPassword();return false;" style="color:var(--accent);font-size:13px;text-decoration:none;">ลืมรหัสผ่าน?</a>
+      </div>
+      <button class="btn btn-primary" style="width:100%;padding:.75rem" onclick="doLogin()">เข้าสู่ระบบ</button>
+    </div>
+    <div class="auth-form" id="registerForm" style="display:none">
+      <div class="form-group"><label>ชื่อ-นามสกุล *</label><input id="regName" placeholder="ชื่อ นามสกุล"></div>
+      <div class="form-group"><label>อีเมล *</label><input id="regEmail" type="email" placeholder="email@example.com"></div>
+      <div class="form-group"><label>เบอร์โทรศัพท์</label><input id="regPhone" placeholder="08x-xxx-xxxx"></div>
+      <div class="form-group"><label>รหัสผ่าน *</label><input id="regPass" type="password" placeholder="อย่างน้อย 6 ตัวอักษร"></div>
+      <button class="btn btn-primary" style="width:100%;padding:.75rem" onclick="doRegister()">สมัครสมาชิก</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR CODE MODAL -->
+<div class="overlay" id="qrModal" onclick="closeModal(event)">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <strong>📱 ชำระเงินด้วย PromptPay</strong>
+      <button class="close-btn" onclick="document.getElementById('qrModal').classList.remove('open')">✕</button>
+    </div>
+    <div style="padding:1.5rem;text-align:center">
+      <p style="font-size:.88rem;color:var(--text2);margin-bottom:1.2rem">เปิดแอปธนาคาร → สแกน QR Code → ชำระเงิน</p>
+      <div style="background:#fff;padding:1.2rem;border-radius:14px;display:inline-block;margin-bottom:1rem;box-shadow:0 4px 20px rgba(0,0,0,.25)">
+        <div id="qrCodeFull"></div>
+      </div>
+      <div id="qrAmt" style="font-size:1.6rem;font-weight:700;color:var(--accent);margin-bottom:.2rem"></div>
+      <div id="qrPhone" style="font-size:.85rem;color:var(--text2);margin-bottom:.2rem"></div>
+      <div id="qrOid" style="font-size:.75rem;color:var(--text2);margin-bottom:1.2rem"></div>
+      <div style="background:rgba(240,165,0,.07);border:1px solid rgba(240,165,0,.2);border-radius:8px;padding:.85rem;font-size:.82rem;color:var(--text2);line-height:1.8;margin-bottom:1.5rem;text-align:left">
+        ⏱ กรุณาชำระภายใน <strong style="color:var(--accent)">15 นาที</strong><br>
+        ✅ หลังโอนแล้ว กด <strong style="color:var(--text)">"ยืนยันการชำระ"</strong> เพื่อดำเนินการต่อ
+      </div>
+      <div style="display:flex;gap:.75rem">
+        <button class="btn btn-ghost" style="flex:1" onclick="document.getElementById('qrModal').classList.remove('open')">ยกเลิก</button>
+        <button class="btn btn-primary" style="flex:1" onclick="confirmQR()">✅ ยืนยันการชำระ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CART SIDEBAR -->
+<div class="cart-sidebar" id="cartSidebar">
+  <div class="cart-head">
+    <span>🛒 ตะกร้าสินค้า</span>
+    <button class="close-btn" onclick="toggleCart()">✕</button>
+  </div>
+  <div class="cart-items" id="cartItems"><div class="empty-state"><div>🛒</div>ตะกร้าว่างเปล่า</div></div>
+  <div class="cart-foot">
+    <div class="cart-total"><span>ยอดรวม</span><span id="cartTotal" style="color:var(--accent)">฿0</span></div>
+    <button class="btn btn-primary" style="width:100%;padding:.75rem" onclick="goCheckout()">ดำเนินการชำระเงิน →</button>
+  </div>
+</div>
+
+
+<!-- FORGOT PASSWORD MODAL -->
+<div class="modal-backdrop" id="forgotModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <strong>🔑 ลืมรหัสผ่าน</strong>
+      <button class="close-btn" onclick="closeForgotModal()">✕</button>
+    </div>
+    <div style="padding:24px;display:flex;flex-direction:column;gap:16px;">
+      <p style="color:var(--text2);margin:0;font-size:14px;">กรอกอีเมลที่ลงทะเบียนไว้ เราจะส่งลิงค์รีเซ็ตรหัสผ่านไปให้</p>
+      <div class="form-group">
+        <label>อีเมล</label>
+        <input id="forgotEmail" type="email" placeholder="email@example.com" onkeydown="if(event.key===&apos;Enter&apos;) doForgotPassword()">
+      </div>
+      <div id="forgotMsg" class="form-msg"></div>
+      <button id="forgotBtn" class="btn btn-primary" style="width:100%;padding:.75rem" onclick="doForgotPassword()">ส่งลิงค์รีเซ็ต</button>
+      <a href="#" onclick="closeForgotModal();openAuth(&apos;login&apos;);return false;"
+         style="text-align:center;color:var(--text2);font-size:13px;text-decoration:none;">← กลับไปหน้าเข้าสู่ระบบ</a>
+    </div>
+  </div>
+</div>
+
+<!-- RESET PASSWORD MODAL -->
+<div class="modal-backdrop" id="resetModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <strong>🔐 ตั้งรหัสผ่านใหม่</strong>
+      <button class="close-btn" onclick="closeResetModal()">✕</button>
+    </div>
+    <div style="padding:24px;display:flex;flex-direction:column;gap:16px;">
+      <input type="hidden" id="resetToken">
+      <div class="form-group">
+        <label>รหัสผ่านใหม่</label>
+        <input id="resetNewPass" type="password" placeholder="อย่างน้อย 6 ตัวอักษร">
+      </div>
+      <div class="form-group">
+        <label>ยืนยันรหัสผ่านใหม่</label>
+        <input id="resetConfirmPass" type="password" placeholder="กรอกรหัสผ่านอีกครั้ง" onkeydown="if(event.key===&apos;Enter&apos;) doResetPassword()">
+      </div>
+      <div id="resetMsg" class="form-msg"></div>
+      <button id="resetBtn" class="btn btn-primary" style="width:100%;padding:.75rem" onclick="doResetPassword()">บันทึกรหัสผ่านใหม่</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCRIPTS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/cart.js"></script>
+<script src="js/admin.js"></script>
+<script src="js/pages.js"></script>
+<script>
+  // restore session และโหลดหน้าแรก
+  restoreSession();
+  renderCart();
+  checkResetToken();
+  // โหลดสินค้าจาก DB ก่อนแสดงหน้าแรก
+  loadProducts().then(() => {
+    showPage('home');
+  });
+
+  // แสดง hamburger button บนมือถือ
+  function checkMobile() {
+    const btn = document.querySelector('.mobile-menu-btn');
+    if (btn) btn.style.display = window.innerWidth <= 768 ? '' : 'none';
+  }
+  checkMobile();
+  window.addEventListener('resize', checkMobile);
+</script>
+<script>
+// ===== PROMPTPAY QR MODULE =====
+
+// สร้าง PromptPay EMV QR Payload
+function buildPromptPayPayload(phone, amount) {
+  const clean = phone.replace(/[-\s]/g, '');
+  let id = clean.length === 13 ? clean : '0066' + clean.slice(1); // บัตรปชช / เบอร์
+
+  const f = (tag, val) => tag + String(val.length).padStart(2,'0') + val;
+  const merchant = f('29', f('00','A000000677010111') + f('01', id));
+  let payload = '000201' + merchant + '5303764';
+  if (amount > 0) payload += f('54', amount.toFixed(2));
+  payload += '5802TH6304';
+
+  // CRC16-CCITT
+  let crc = 0xFFFF;
+  for (let i = 0; i < payload.length; i++) {
+    crc ^= payload.charCodeAt(i) << 8;
+    for (let j = 0; j < 8; j++) crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+  }
+  return payload + (crc & 0xFFFF).toString(16).toUpperCase().padStart(4,'0');
+}
+
+function togglePromptPay(show) {
+  document.getElementById('promptpayBox').style.display = show ? 'block' : 'none';
+  if (!show) { document.getElementById('liveQRWrap').style.display = 'none'; document.getElementById('liveQRCode').innerHTML = ''; }
+}
+
+// แสดง QR preview แบบ live
+let liveQRObj = null;
+function liveQR(val) {
+  const clean = val.replace(/[-\s]/g,'');
+  const wrap = document.getElementById('liveQRWrap');
+  const box = document.getElementById('liveQRCode');
+  if (clean.length < 10) { wrap.style.display='none'; box.innerHTML=''; liveQRObj=null; return; }
+  const total = cart.reduce((s,x)=>s+x.price*x.qty, 0);
+  box.innerHTML = ''; liveQRObj = null; wrap.style.display = 'block';
+  liveQRObj = new QRCode(box, { text: buildPromptPayPayload(clean, total), width:130, height:130, colorDark:'#000', colorLight:'#fff', correctLevel: QRCode.CorrectLevel.M });
+}
+
+// Order รอ confirm
+let _pendingOrder = null;
+
+function placeOrder() {
+  const name = document.getElementById('ckName').value.trim();
+  const phone = document.getElementById('ckPhone').value.trim();
+  const addr = document.getElementById('ckAddr').value.trim();
+  if (!name || !phone || !addr) { toast('กรุณากรอกข้อมูลให้ครบ', 'error'); return; }
+  const payment = document.querySelector('input[name="payment"]:checked').value;
+  const total = cart.reduce((s,x)=>s+x.price*x.qty, 0);
+  const order = {
+    id: 'ORD' + String(Date.now()).slice(-6),
+    userId: currentUser.id,
+    items: cart.map(i=>({id:i.id,name:i.name,emoji:i.emoji,qty:i.qty,price:i.price})),
+    total, status:'pending', date: new Date().toISOString().slice(0,10),
+    address: addr, phone, payment
+  };
+  if (payment === 'promptpay') {
+    const ppNum = document.getElementById('ppNumber').value.trim();
+    if (!ppNum || ppNum.replace(/[-\s]/g,'').length < 10) { toast('กรุณากรอกเบอร์ PromptPay ให้ครบ', 'error'); return; }
+    _pendingOrder = order;
+    openQRModal(ppNum, total, order.id);
+  } else {
+    saveOrder(order);
+  }
+}
+
+function openQRModal(ppNum, amount, orderId) {
+  const payload = buildPromptPayPayload(ppNum, amount);
+  document.getElementById('qrCodeFull').innerHTML = '';
+  document.getElementById('qrAmt').textContent = '฿' + amount.toLocaleString();
+  document.getElementById('qrPhone').textContent = '📞 ' + ppNum;
+  document.getElementById('qrOid').textContent = 'ออเดอร์: ' + orderId;
+  document.getElementById('qrModal').classList.add('open');
+  setTimeout(() => {
+    new QRCode(document.getElementById('qrCodeFull'), {
+      text: payload, width: 220, height: 220,
+      colorDark: '#000000', colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  }, 80);
+}
+
+function confirmQR() {
+  if (_pendingOrder) { saveOrder(_pendingOrder); _pendingOrder = null; }
+  document.getElementById('qrModal').classList.remove('open');
+}
+
+async function saveOrder(order) {
+  try {
+    const res = await fetch('api.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'order', ...order })
+    });
+    const result = await res.json();
+    if (!result.ok) { toast('เกิดข้อผิดพลาดในการสั่งซื้อ', 'error'); return; }
+    orders.push(order);
+    cart = [];
+    renderCart();
+    toast('🎉 สั่งซื้อสำเร็จ! หมายเลข ' + order.id, 'success');
+    showPage('profile');
+  } catch (err) {
+    toast('ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้', 'error');
+  }
+}
+</script>
+</body>
+</html>
